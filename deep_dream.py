@@ -60,8 +60,8 @@ def deep_dream(image, model, iterations, lr, octave_scale, num_octaves, guide_im
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--image_path", type=str, default="images/supermarket.jpg", help="path to input image")
-    parser.add_argument("--guide_path", type=str, default="images/dog.jpg", help="path to guide image")
+    parser.add_argument("--input_image", type=str, default="images/supermarket.jpg", help="path to input image")
+    parser.add_argument("--guide_image", type=str, default="images/dog.jpg", help="path to guide image")
     parser.add_argument("--iterations", default=15, help="number of gradient ascent steps per octave")
     parser.add_argument("--lr", default=0.01, help="learning rate")
     parser.add_argument("--octave_scale", default=1.4, help="image scale between octaves")
@@ -69,8 +69,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load images
-    image = Image.open(args.image_path)
-    guide_image = Image.open(args.image_path) if args.guide_path else None
+    image = Image.open(args.input_image)
+    guide_image = Image.open(args.input_image) if args.guide_image else None
 
     # Define the model
     network = models.vgg19(pretrained=True)
@@ -92,8 +92,8 @@ if __name__ == "__main__":
 
     # Save and plot image
     os.makedirs("outputs", exist_ok=True)
-    filename = args.image_path.split("/")[-1]
+    filename = args.input_image.split("/")[-1]
     plt.figure(figsize=(20, 20))
     plt.imshow(dreamed_image)
-    plt.imsave(f"outputs/output_{filename}.jpg", dreamed_image)
+    plt.imsave(f"outputs/output_{filename}", dreamed_image)
     plt.show()
