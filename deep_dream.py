@@ -22,8 +22,8 @@ def dream(image, model, iterations, lr):
         out = model(image)
         loss = out.norm()
         loss.backward()
-        ratio = np.abs(image.grad.data.cpu().numpy()).mean()
-        norm_lr = lr / ratio
+        avg_grad = np.abs(image.grad.data.cpu().numpy()).mean()
+        norm_lr = lr / avg_grad
         image.data += norm_lr * image.grad.data
         image.data = clip(image.data)
 
