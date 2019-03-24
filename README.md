@@ -1,7 +1,7 @@
-# Pytorch-Deep-Dream
-PyTorch implementation of Deep Dream.
+# Pytorch - Deep Dream
+Minimal PyTorch implementation of Deep Dream.
 
-## Example
+## Examples
 `$ python3 deep_dream.py --input_image images/supermarket.jpg`
 <p align="center">
     <img src="outputs/output_supermarket.jpg" width="512"\>
