@@ -11,13 +11,16 @@ import tqdm
 import scipy.ndimage as nd
 from utils import deprocess, preprocess, clip
 
+Tensor = torch.cuda.FloatTensor if torch.cuda.is_available else torch.FloatTensor
 
-def dream(image, model, iterations, lr, guide_features=None):
-    image = Variable(torch.cuda.FloatTensor(image), requires_grad=True)
+
+def dream(image, model, iterations, lr):
+    """ Updates the image to maximize outputs for n iterations """
+    image = Variable(Tensor(image), requires_grad=True)
     for i in range(iterations):
         model.zero_grad()
         out = model(image)
-        loss = torch.index_select(out, 1, guide_features).norm() if guide_features is not None else out.norm()
+        loss = out.norm()
         loss.backward()
         ratio = np.abs(image.grad.data.cpu().numpy()).mean()
         norm_lr = lr / ratio
@@ -27,17 +30,9 @@ def dream(image, model, iterations, lr, guide_features=None):
     return image.cpu().data.numpy()
 
 
-def deep_dream(image, model, iterations, lr, octave_scale, num_octaves, guide_image=None):
+def deep_dream(image, model, iterations, lr, octave_scale, num_octaves):
+    """ Main deep dream method """
     image = preprocess(image).unsqueeze(0)
-
-    guide_features = None
-    if guide_image is not None:
-        # Extract interesting features from guide image
-        guide_image = preprocess(guide_image).unsqueeze(0)
-        guide_image = Variable(guide_image.type(torch.cuda.FloatTensor))
-        out = model(guide_image).cpu().data.numpy().squeeze()
-        out = out.reshape((out.shape[0], -1))
-        guide_features = torch.cuda.LongTensor(np.argsort(out.mean(axis=1))[-10:])
 
     # Extract octaves for each dimension
     octaves = [image.cpu().data.numpy()]
@@ -50,11 +45,11 @@ def deep_dream(image, model, iterations, lr, octave_scale, num_octaves, guide_im
             # Upsample detail to new dimension
             h, w = octave_base.shape[-2:]
             dh, dw = detail.shape[-2:]
-            detail = nd.zoom(detail, (1, 1, 1.0 * h / dh, 1.0 * w / dw), order=1)
+            detail = nd.zoom(detail, (1, 1, h / dh, w / dw), order=1)
         # Add deep dream detail from previous octave to new base
         input_image = octave_base + detail
         # Get new deep dream image
-        dreamed_image = dream(input_image, model, iterations, lr, guide_features)
+        dreamed_image = dream(input_image, model, iterations, lr)
         # Extract deep dream details
         detail = dreamed_image - octave_base
 
@@ -64,22 +59,22 @@ def deep_dream(image, model, iterations, lr, octave_scale, num_octaves, guide_im
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_image", type=str, default="images/supermarket.jpg", help="path to input image")
-    parser.add_argument("--guide_image", type=str, default=None, help="path to guide image")
     parser.add_argument("--iterations", default=15, help="number of gradient ascent steps per octave")
+    parser.add_argument("--at_layer", default=27, type=int, help="layer at which we modify image to maximize outputs")
     parser.add_argument("--lr", default=0.01, help="learning rate")
     parser.add_argument("--octave_scale", default=1.4, help="image scale between octaves")
     parser.add_argument("--num_octaves", default=10, help="number of octaves")
     args = parser.parse_args()
 
-    # Load images
+    # Load image
     image = Image.open(args.input_image)
-    guide_image = Image.open(args.input_image) if args.guide_image else None
 
     # Define the model
     network = models.vgg19(pretrained=True)
     layers = list(network.features.children())
-    model = nn.Sequential(*layers[:28])
-    model = model.cuda()
+    model = nn.Sequential(*layers[: (args.at_layer + 1)])
+    if torch.cuda.is_available:
+        model = model.cuda()
     print(network)
 
     # Extract deep dream image
@@ -90,7 +85,6 @@ if __name__ == "__main__":
         lr=args.lr,
         octave_scale=args.octave_scale,
         num_octaves=args.num_octaves,
-        guide_image=guide_image,
     )
 
     # Save and plot image
