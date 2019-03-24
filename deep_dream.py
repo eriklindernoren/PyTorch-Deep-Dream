@@ -7,23 +7,17 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import argparse
 import os
+import tqdm
 import scipy.ndimage as nd
 from utils import deprocess, preprocess, clip
 
 
-def dream(image, model, iterations, lr, guide_image=None):
+def dream(image, model, iterations, lr, guide_features=None):
     image = Variable(torch.cuda.FloatTensor(image), requires_grad=True)
-    # Extract guide features if guide image is available
-    if guide_image is not None:
-        h, w = image.shape[-2:]
-        guide_image = preprocess(guide_image.resize((w, h))).unsqueeze(0)
-        guide_image = Variable(guide_image.type(torch.cuda.FloatTensor))
-        guide_features = model(guide_image).detach().data
-    # Update image for n iterations
     for i in range(iterations):
         model.zero_grad()
         out = model(image)
-        loss = out.norm() - nn.MSELoss()(out, guide_features) if guide_image is not None else out.norm()
+        loss = torch.index_select(out, 1, guide_features).norm() if guide_features is not None else out.norm()
         loss.backward()
         ratio = np.abs(image.grad.data.cpu().numpy()).mean()
         norm_lr = lr / ratio
@@ -36,22 +30,31 @@ def dream(image, model, iterations, lr, guide_image=None):
 def deep_dream(image, model, iterations, lr, octave_scale, num_octaves, guide_image=None):
     image = preprocess(image).unsqueeze(0)
 
+    guide_features = None
+    if guide_image is not None:
+        # Extract interesting features from guide image
+        guide_image = preprocess(guide_image).unsqueeze(0)
+        guide_image = Variable(guide_image.type(torch.cuda.FloatTensor))
+        out = model(guide_image).cpu().data.numpy().squeeze()
+        out = out.reshape((out.shape[0], -1))
+        guide_features = torch.cuda.LongTensor(np.argsort(out.mean(axis=1))[-10:])
+
     # Extract octaves for each dimension
     octaves = [image.cpu().data.numpy()]
     for i in range(num_octaves - 1):
         octaves.append(nd.zoom(octaves[-1], (1, 1, 1.0 / octave_scale, 1.0 / octave_scale), order=1))
 
     detail = np.zeros_like(octaves[-1])
-    for octave, octave_base in enumerate(octaves[::-1]):
-        h, w = octave_base.shape[-2:]
-        # Upsample detail to new dimension
+    for octave, octave_base in enumerate(tqdm.tqdm(octaves[::-1], desc="Dreaming")):
         if octave > 0:
+            # Upsample detail to new dimension
+            h, w = octave_base.shape[-2:]
             dh, dw = detail.shape[-2:]
             detail = nd.zoom(detail, (1, 1, 1.0 * h / dh, 1.0 * w / dw), order=1)
         # Add deep dream detail from previous octave to new base
-        input_oct = octave_base + detail
+        input_image = octave_base + detail
         # Get new deep dream image
-        dreamed_image = dream(input_oct, model, iterations, lr, guide_image)
+        dreamed_image = dream(input_image, model, iterations, lr, guide_features)
         # Extract deep dream details
         detail = dreamed_image - octave_base
 
@@ -61,7 +64,7 @@ def deep_dream(image, model, iterations, lr, octave_scale, num_octaves, guide_im
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_image", type=str, default="images/supermarket.jpg", help="path to input image")
-    parser.add_argument("--guide_image", type=str, default="images/dog.jpg", help="path to guide image")
+    parser.add_argument("--guide_image", type=str, default=None, help="path to guide image")
     parser.add_argument("--iterations", default=15, help="number of gradient ascent steps per octave")
     parser.add_argument("--lr", default=0.01, help="learning rate")
     parser.add_argument("--octave_scale", default=1.4, help="image scale between octaves")
