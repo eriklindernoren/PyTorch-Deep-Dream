@@ -26,16 +26,16 @@ def dream(image, model, iterations, lr):
         norm_lr = lr / ratio
         image.data += norm_lr * image.grad.data
         image.data = clip(image.data)
-
+        image.grad.data.zero_()
     return image.cpu().data.numpy()
 
 
 def deep_dream(image, model, iterations, lr, octave_scale, num_octaves):
     """ Main deep dream method """
-    image = preprocess(image).unsqueeze(0)
+    image = preprocess(image).unsqueeze(0).cpu().data.numpy()
 
     # Extract octaves for each dimension
-    octaves = [image.cpu().data.numpy()]
+    octaves = [image]
     for i in range(num_octaves - 1):
         octaves.append(nd.zoom(octaves[-1], (1, 1, 1.0 / octave_scale, 1.0 / octave_scale), order=1))
 
@@ -59,7 +59,7 @@ def deep_dream(image, model, iterations, lr, octave_scale, num_octaves):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_image", type=str, default="images/supermarket.jpg", help="path to input image")
-    parser.add_argument("--iterations", default=15, help="number of gradient ascent steps per octave")
+    parser.add_argument("--iterations", default=20, help="number of gradient ascent steps per octave")
     parser.add_argument("--at_layer", default=27, type=int, help="layer at which we modify image to maximize outputs")
     parser.add_argument("--lr", default=0.01, help="learning rate")
     parser.add_argument("--octave_scale", default=1.4, help="image scale between octaves")
@@ -68,6 +68,7 @@ if __name__ == "__main__":
 
     # Load image
     image = Image.open(args.input_image)
+    image = Image.fromarray(np.array(image)[:, :, :3])
 
     # Define the model
     network = models.vgg19(pretrained=True)
