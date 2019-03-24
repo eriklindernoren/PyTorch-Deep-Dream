@@ -68,7 +68,6 @@ if __name__ == "__main__":
 
     # Load image
     image = Image.open(args.input_image)
-    image = Image.fromarray(np.array(image)[:, :, :3])
 
     # Define the model
     network = models.vgg19(pretrained=True)
