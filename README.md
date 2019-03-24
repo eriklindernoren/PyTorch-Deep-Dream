@@ -1,5 +1,5 @@
 # Pytorch-Deep-Dream
-PyTorch implementation of Google's Deep Dream algorithm.
+PyTorch implementation of Deep Dream.
 
 ## Example
 `python3 deep_dream.py --image_path images/supermarket.jpg`
