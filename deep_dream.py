@@ -11,11 +11,10 @@ import tqdm
 import scipy.ndimage as nd
 from utils import deprocess, preprocess, clip
 
-Tensor = torch.cuda.FloatTensor if torch.cuda.is_available else torch.FloatTensor
-
 
 def dream(image, model, iterations, lr):
     """ Updates the image to maximize outputs for n iterations """
+    Tensor = torch.cuda.FloatTensor if torch.cuda.is_available else torch.FloatTensor
     image = Variable(Tensor(image), requires_grad=True)
     for i in range(iterations):
         model.zero_grad()
@@ -34,18 +33,16 @@ def deep_dream(image, model, iterations, lr, octave_scale, num_octaves):
     """ Main deep dream method """
     image = preprocess(image).unsqueeze(0).cpu().data.numpy()
 
-    # Extract octaves for each dimension
+    # Extract image representations for each octave
     octaves = [image]
-    for i in range(num_octaves - 1):
-        octaves.append(nd.zoom(octaves[-1], (1, 1, 1.0 / octave_scale, 1.0 / octave_scale), order=1))
+    for _ in range(num_octaves - 1):
+        octaves.append(nd.zoom(octaves[-1], (1, 1, 1 / octave_scale, 1 / octave_scale), order=1))
 
     detail = np.zeros_like(octaves[-1])
     for octave, octave_base in enumerate(tqdm.tqdm(octaves[::-1], desc="Dreaming")):
         if octave > 0:
-            # Upsample detail to new dimension
-            h, w = octave_base.shape[-2:]
-            dh, dw = detail.shape[-2:]
-            detail = nd.zoom(detail, (1, 1, h / dh, w / dw), order=1)
+            # Upsample detail to new octave dimension
+            detail = nd.zoom(detail, np.array(octave_base.shape) / np.array(detail.shape), order=1)
         # Add deep dream detail from previous octave to new base
         input_image = octave_base + detail
         # Get new deep dream image
