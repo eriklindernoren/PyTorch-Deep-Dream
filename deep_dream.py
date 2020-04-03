@@ -14,7 +14,7 @@ from utils import deprocess, preprocess, clip
 
 def dream(image, model, iterations, lr):
     """ Updates the image to maximize outputs for n iterations """
-    Tensor = torch.cuda.FloatTensor if torch.cuda.is_available else torch.FloatTensor
+    Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
     image = Variable(Tensor(image), requires_grad=True)
     for i in range(iterations):
         model.zero_grad()
@@ -22,7 +22,7 @@ def dream(image, model, iterations, lr):
         loss = out.norm()
         loss.backward()
         avg_grad = np.abs(image.grad.data.cpu().numpy()).mean()
-        norm_lr = lr / avg_grad
+        norm_lr = float(lr / avg_grad)
         image.data += norm_lr * image.grad.data
         image.data = clip(image.data)
         image.grad.data.zero_()
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     network = models.vgg19(pretrained=True)
     layers = list(network.features.children())
     model = nn.Sequential(*layers[: (args.at_layer + 1)])
-    if torch.cuda.is_available:
+    if torch.cuda.is_available():
         model = model.cuda()
     print(network)
 
@@ -89,5 +89,5 @@ if __name__ == "__main__":
     filename = args.input_image.split("/")[-1]
     plt.figure(figsize=(20, 20))
     plt.imshow(dreamed_image)
-    plt.imsave(f"outputs/output_{filename}", dreamed_image)
+    plt.imsave("outputs/output_{}".format(filename), dreamed_image)
     plt.show()
