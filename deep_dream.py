@@ -58,8 +58,8 @@ if __name__ == "__main__":
     parser.add_argument("--input_image", type=str, default="images/supermarket.jpg", help="path to input image")
     parser.add_argument("--iterations", default=20, help="number of gradient ascent steps per octave")
     parser.add_argument("--at_layer", default=27, type=int, help="layer at which we modify image to maximize outputs")
-    parser.add_argument("--lr", default=0.01, help="learning rate")
-    parser.add_argument("--octave_scale", default=1.4, help="image scale between octaves")
+    parser.add_argument("--lr", default=0.01, type=float, help="learning rate")
+    parser.add_argument("--octave_scale", default=1.4, type=float, help="image scale between octaves")
     parser.add_argument("--num_octaves", default=10, help="number of octaves")
     args = parser.parse_args()
 
