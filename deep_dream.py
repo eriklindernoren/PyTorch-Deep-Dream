@@ -53,6 +53,10 @@ def deep_dream(image, model, iterations, lr, octave_scale, num_octaves):
     return deprocess(dreamed_image)
 
 
+def norm(x):
+    return np.array((x - np.min(x)) / (np.max(x) - np.min(x)))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_image", type=str, default="images/supermarket.jpg", help="path to input image")
@@ -89,5 +93,5 @@ if __name__ == "__main__":
     filename = args.input_image.split("/")[-1]
     plt.figure(figsize=(20, 20))
     plt.imshow(dreamed_image)
-    plt.imsave(f"outputs/output_{filename}", dreamed_image)
+    plt.imsave(f"outputs/output_{filename}", norm(dreamed_image))
     plt.show()
