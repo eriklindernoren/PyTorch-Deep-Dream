@@ -96,6 +96,11 @@ if __name__ == "__main__":
         device=device
     )
 
+    # Normalize image
+    min_val = np.min(dreamed_image)
+    max_val = np.max(dreamed_image)
+    dreamed_image = (dreamed_image - min_val) / (max_val - min_val)
+
     # Save and plot image
     os.makedirs("outputs", exist_ok=True)
     filename = args.input_image.split("/")[-1]
