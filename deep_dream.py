@@ -12,10 +12,9 @@ import scipy.ndimage as nd
 from utils import deprocess, preprocess, clip
 
 
-def dream(image, model, iterations, lr):
+def dream(image, model, iterations, lr, device):
     """ Updates the image to maximize outputs for n iterations """
-    Tensor = torch.cuda.FloatTensor if torch.cuda.is_available else torch.FloatTensor
-    image = Variable(Tensor(image), requires_grad=True)
+    image = Variable(torch.tensor(image, device=device), requires_grad=True)
     for i in range(iterations):
         model.zero_grad()
         out = model(image)
@@ -29,7 +28,7 @@ def dream(image, model, iterations, lr):
     return image.cpu().data.numpy()
 
 
-def deep_dream(image, model, iterations, lr, octave_scale, num_octaves):
+def deep_dream(image, model, iterations, lr, octave_scale, num_octaves, device):
     """ Main deep dream method """
     image = preprocess(image).unsqueeze(0).cpu().data.numpy()
 
@@ -46,7 +45,7 @@ def deep_dream(image, model, iterations, lr, octave_scale, num_octaves):
         # Add deep dream detail from previous octave to new base
         input_image = octave_base + detail
         # Get new deep dream image
-        dreamed_image = dream(input_image, model, iterations, lr)
+        dreamed_image = dream(input_image, model, iterations, lr, device)
         # Extract deep dream details
         detail = dreamed_image - octave_base
 
@@ -65,13 +64,25 @@ if __name__ == "__main__":
 
     # Load image
     image = Image.open(args.input_image)
+    
+    # Find GPU
+    if torch.cuda.is_available():
+        #logging.info("Detected CUDA GPU")
+        device = torch.device("cuda")
+
+    elif torch.backends.mps.is_available():
+        #logging.info("Detected Metal GPU (macOS)")
+        device = torch.device("mps")
+
+    else:
+        #logging.info("No GPU detected")
+        device = torch.device("cpu")
 
     # Define the model
-    network = models.vgg19(pretrained=True)
+    network = models.vgg19(weights=models.VGG19_Weights.IMAGENET1K_V1)
     layers = list(network.features.children())
     model = nn.Sequential(*layers[: (args.at_layer + 1)])
-    if torch.cuda.is_available:
-        model = model.cuda()
+    model.to(device)
     print(network)
 
     # Extract deep dream image
@@ -82,7 +93,13 @@ if __name__ == "__main__":
         lr=args.lr,
         octave_scale=args.octave_scale,
         num_octaves=args.num_octaves,
+        device=device
     )
+
+    # Normalize image
+    min_val = np.min(dreamed_image)
+    max_val = np.max(dreamed_image)
+    dreamed_image = (dreamed_image - min_val) / (max_val - min_val)
 
     # Save and plot image
     os.makedirs("outputs", exist_ok=True)
