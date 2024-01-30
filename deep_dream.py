@@ -67,7 +67,7 @@ if __name__ == "__main__":
     image = Image.open(args.input_image)
 
     # Define the model
-    network = models.vgg19(pretrained=True)
+    network = models.vgg19(weights=models.VGG19_Weights.IMAGENET1K_V1)
     layers = list(network.features.children())
     model = nn.Sequential(*layers[: (args.at_layer + 1)])
     if torch.cuda.is_available:
